@@ -32,6 +32,8 @@ jobs:
 
             - name: Create proof of execution with Terraform
               run: terraform -chdir=terraform apply -auto-approve
+              env:
+                  TF_VAR_commit_name: ${{ github.event.head_commit.message || github.event.pull_request.title || github.sha }}
 
             # Runs a single command using the runners shell
             - name: Run a one-line script
