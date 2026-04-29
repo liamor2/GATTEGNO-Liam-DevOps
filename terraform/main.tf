@@ -10,6 +10,6 @@ resource "terraform_data" "proof_of_execution" {
   triggers_replace = timestamp()
 
   provisioner "local-exec" {
-    command = "printf '%s\n' 'Executed at ${self.input.executed_at}' > ../proof_of_execution"
+    command = "printf '%s\n' 'Executed at ${self.input.executed_at}. Created with Terraform.' > ../proof_of_execution"
   }
 }
