@@ -1,3 +1,9 @@
 runner
 
 .codex
+
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+proof_of_execution

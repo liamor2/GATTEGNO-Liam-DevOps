@@ -22,8 +22,14 @@ jobs:
             # Checks-out your repository und
             - uses: actions/checkout@v4
 
-            - name: Create proof of execution
-              run: date -u +"Executed at %Y-%m-%dT%H:%M:%SZ" > "proof_of_execution"
+            - name: Setup Terraform
+              uses: hashicorp/setup-terraform@v3
+
+            - name: Initialize Terraform
+              run: terraform -chdir=terraform init
+
+            - name: Create proof of execution with Terraform
+              run: terraform -chdir=terraform apply -auto-approve
 
             # Runs a single command using the runners shell
             - name: Run a one-line script
