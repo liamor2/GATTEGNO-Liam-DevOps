@@ -73,3 +73,58 @@ Includes:
 
 - JPA schema mode is `update` for quick bootstrap.
 - CI/CD is intentionally not implemented yet.
+
+## Auto Deploy On Self-Hosted Runner (Terraform + Docker Compose)
+
+This repository supports automatic deployment on push/merge to `main` using a self-hosted GitHub Actions runner.
+
+### 1. Prepare the remote server
+
+Install on the server:
+- Docker Engine
+- Docker Compose plugin (`docker compose`)
+- Terraform CLI (>= 1.6) or use the bundled runner image in `runner/`
+
+Ensure the runner user can run Docker commands.
+
+### Alternative: runner as Docker container
+
+You can run the self-hosted runner from this repo:
+- [runner/Dockerfile](g:\Projet\Efrei\M1\DevOps\DevOps\runner\Dockerfile)
+- [runner/docker-compose.yml](g:\Projet\Efrei\M1\DevOps\DevOps\runner\docker-compose.yml)
+- [runner/.env.example](g:\Projet\Efrei\M1\DevOps\DevOps\runner\.env.example)
+
+Steps on the server:
+1. `cd runner`
+2. `cp .env.example .env`
+3. Fill `GITHUB_URL` and `GITHUB_TOKEN` in `.env`
+4. `docker compose up -d --build`
+
+The runner container is pre-bundled with Node, Java 21, Maven, Terraform, Docker CLI, and Compose plugin, and uses the host Docker socket.
+
+### 2. Add GitHub repository secret
+
+In `Settings > Secrets and variables > Actions`, add:
+- `DEPLOY_APP_ENV`: full `.env` content used by `docker-compose.yml` during deploy
+
+Example:
+
+```env
+POSTGRES_DB=clickdb
+POSTGRES_USER=clickuser
+POSTGRES_PASSWORD=clickpass
+APP_CORS_ALLOWED_ORIGIN_PATTERNS=http://localhost:*,http://127.0.0.1:*
+VITE_API_BASE_URL=http://localhost:8080
+```
+
+### 3. How deployment works
+
+On push to `main`:
+1. Frontend/backend quality checks and tests run.
+2. Terraform plan runs in validation mode (`deploy_enabled=false`).
+3. Playwright E2E runs.
+4. `terraform-apply-auto` runs on the self-hosted runner with:
+   - `deploy_enabled=true`
+   - `deploy_mode=self_hosted_local`
+5. Terraform writes `.env` at repo root and runs:
+   - `docker compose up -d --build --remove-orphans`

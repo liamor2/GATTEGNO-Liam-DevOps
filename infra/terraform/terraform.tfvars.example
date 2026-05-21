@@ -2,15 +2,19 @@ project_name = "click-tracker"
 environment  = "prod"
 
 deploy_enabled = false
+deploy_mode    = "self_hosted_local"
 deploy_version = "manual"
 
-vm_host     = "127.0.0.1"
+# Replace with your VM details for local runs.
+vm_host     = "203.0.113.10"
 vm_user     = "ubuntu"
 vm_ssh_port = 22
 vm_app_dir  = "/opt/click-tracker"
 
+# Path to private key on the machine running terraform.
 ssh_private_key_path = "/tmp/deploy_key"
 
+# .env content copied to VM before docker compose up.
 app_env_content = <<-EOT
 POSTGRES_DB=clickdb
 POSTGRES_USER=clickuser

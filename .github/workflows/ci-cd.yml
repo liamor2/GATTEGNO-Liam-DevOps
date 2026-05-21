@@ -7,6 +7,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   frontend-quality-tests:
     runs-on: ubuntu-latest
@@ -79,8 +86,8 @@ jobs:
       - name: Terraform validate
         run: terraform validate
 
-      - name: Terraform plan
-        run: terraform plan -out=tfplan
+      - name: Terraform plan (no deploy)
+        run: terraform plan -var="deploy_enabled=false" -var="deploy_version=${GITHUB_SHA}" -out=tfplan
 
       - name: Upload Terraform plan
         uses: actions/upload-artifact@v4
@@ -131,9 +138,9 @@ jobs:
         if: always()
         run: docker compose down -v
 
-  terraform-apply:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+  terraform-apply-auto:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, x64]
     needs:
       - terraform-plan
       - e2e-playwright
@@ -149,14 +156,13 @@ jobs:
         with:
           terraform_version: 1.9.8
 
-      - name: Download Terraform plan
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan
-          path: infra/terraform
-
       - name: Terraform init
         run: terraform init
 
-      - name: Terraform apply
-        run: terraform apply -auto-approve tfplan
+      - name: Terraform apply (auto deploy on self-hosted runner)
+        env:
+          TF_VAR_deploy_enabled: "true"
+          TF_VAR_deploy_mode: "self_hosted_local"
+          TF_VAR_deploy_version: ${{ github.sha }}
+          TF_VAR_app_env_content: ${{ secrets.DEPLOY_APP_ENV }}
+        run: terraform apply -auto-approve

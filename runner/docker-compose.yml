@@ -1,0 +1,20 @@
+services:
+  github-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: github-self-hosted-runner
+    restart: unless-stopped
+    environment:
+      GITHUB_URL: ${GITHUB_URL}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      RUNNER_NAME: ${RUNNER_NAME:-clicktracker-runner}
+      RUNNER_LABELS: ${RUNNER_LABELS:-self-hosted,linux,x64}
+      RUNNER_WORKDIR: ${RUNNER_WORKDIR:-_work}
+    volumes:
+      - runner_data:/actions-runner
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /actions-runner
+
+volumes:
+  runner_data:
