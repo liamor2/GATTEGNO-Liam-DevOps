@@ -1,0 +1,32 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 5173",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "e2e": "playwright test",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check ."
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@playwright/test": "^1.54.2",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.0.1",
+    "@testing-library/user-event": "^14.6.1",
+    "@vitejs/plugin-react": "^4.3.1",
+    "jsdom": "^25.0.1",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.4"
+  }
+}

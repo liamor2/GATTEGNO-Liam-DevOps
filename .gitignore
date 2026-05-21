@@ -1,3 +1,4 @@
+actions-runner
 runner
 
 .codex
@@ -7,3 +8,14 @@ runner
 .terraform/
 .terraform.lock.hcl
 proof_of_execution
+
+frontend/node_modules
+frontend/dist
+backend/target
+.env
+
+infra/terraform/.terraform
+infra/terraform/.terraform.lock.hcl
+infra/terraform/tfplan
+frontend/playwright-report
+frontend/test-results
