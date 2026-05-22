@@ -2,8 +2,9 @@
 
 Dockerized monorepo with:
 - React frontend (Vite)
-- Spring Boot backend (Java 21 + Maven)
+- Spring Boot backend (Java 25 + Maven)
 - PostgreSQL database
+- Prometheus and Grafana monitoring
 
 ## What it does
 
@@ -36,6 +37,8 @@ docker compose up --build
 3. Open frontend:
 
 - http://localhost:5173
+- Grafana: http://localhost:3000 (`admin` / `admin` by default)
+- Prometheus: http://localhost:9090
 
 4. Click the button, then verify DB rows:
 
@@ -46,6 +49,7 @@ docker exec -it clicktracker-db psql -U clickuser -d clickdb -c "SELECT * FROM c
 ## API
 
 - `POST /api/click`
+- Prometheus metrics: `GET /actuator/prometheus`
 - Success response:
 
 ```json
@@ -74,6 +78,22 @@ Includes:
 - JPA schema mode is `update` for quick bootstrap.
 - CI/CD is intentionally not implemented yet.
 
+## Monitoring
+
+Prometheus scrapes the Spring Boot actuator endpoint at `/actuator/prometheus`.
+Grafana is provisioned automatically with:
+- a Prometheus datasource
+- the `Click Tracker Overview` dashboard
+
+The dashboard includes backend availability, click throughput, recorded click count, request latency, JVM memory, CPU usage, and database connection metrics.
+
+Grafana credentials can be overridden with:
+
+```env
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=admin
+```
+
 ## Auto Deploy On Self-Hosted Runner (Terraform + Docker Compose)
 
 This repository supports automatic deployment on push/merge to `main` using a self-hosted GitHub Actions runner.
@@ -83,7 +103,7 @@ This repository supports automatic deployment on push/merge to `main` using a se
 Install on the server:
 - Docker Engine
 - Docker Compose plugin (`docker compose`)
-- Terraform CLI (>= 1.6) or use the bundled runner image in `runner/`
+- Terraform CLI (>= 1.15.4) or use the bundled runner image in `runner/`
 
 Ensure the runner user can run Docker commands.
 
@@ -100,7 +120,7 @@ Steps on the server:
 3. Fill `GITHUB_URL` and `GITHUB_TOKEN` in `.env`
 4. `docker compose up -d --build`
 
-The runner container is pre-bundled with Node, Java 21, Maven, Terraform, Docker CLI, and Compose plugin, and uses the host Docker socket.
+The runner container is pre-bundled with Node, Java 25, Maven, Terraform, Docker CLI, and Compose plugin, and uses the host Docker socket.
 
 ### 2. Add GitHub repository secret
 
