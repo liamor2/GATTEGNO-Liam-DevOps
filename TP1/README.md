@@ -110,9 +110,9 @@ Ensure the runner user can run Docker commands.
 ### Alternative: runner as Docker container
 
 You can run the self-hosted runner from this repo:
-- [runner/Dockerfile](g:\Projet\Efrei\M1\DevOps\DevOps\runner\Dockerfile)
-- [runner/docker-compose.yml](g:\Projet\Efrei\M1\DevOps\DevOps\runner\docker-compose.yml)
-- [runner/.env.example](g:\Projet\Efrei\M1\DevOps\DevOps\runner\.env.example)
+- [runner/Dockerfile](runner/Dockerfile)
+- [runner/docker-compose.yml](runner/docker-compose.yml)
+- [runner/.env.example](runner/.env.example)
 
 Steps on the server:
 1. `cd runner`

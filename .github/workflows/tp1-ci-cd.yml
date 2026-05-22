@@ -1,17 +1,20 @@
-name: CI-CD
+name: TP1 CI-CD
 
 on:
   push:
     branches:
       - main
+    paths:
+      - "TP1/**"
   pull_request:
-  workflow_dispatch:
+    paths:
+      - "TP1/**"
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-cd-${{ github.ref }}
+  group: tp1-ci-cd-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -19,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: frontend
+        working-directory: TP1/frontend
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -42,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: TP1/backend
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -67,7 +70,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: infra/terraform
+        working-directory: TP1/infra/terraform
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -93,7 +96,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: tfplan
-          path: infra/terraform/tfplan
+          path: TP1/infra/terraform/tfplan
 
   e2e-playwright:
     runs-on: ubuntu-latest
@@ -110,14 +113,15 @@ jobs:
           node-version: 26.2.0
 
       - name: Install frontend dependencies
-        working-directory: frontend
+        working-directory: TP1/frontend
         run: npm install
 
       - name: Install Playwright browsers
-        working-directory: frontend
+        working-directory: TP1/frontend
         run: npx playwright install --with-deps chromium
 
       - name: Start stack
+        working-directory: TP1
         run: docker compose up -d --build
 
       - name: Wait for frontend
@@ -141,11 +145,12 @@ jobs:
           exit 1
 
       - name: Run Playwright e2e
-        working-directory: frontend
+        working-directory: TP1/frontend
         run: npm run e2e
 
       - name: Stop stack
         if: always()
+        working-directory: TP1
         run: docker compose down -v
 
   terraform-apply-auto:
@@ -156,7 +161,7 @@ jobs:
       - e2e-playwright
     defaults:
       run:
-        working-directory: infra/terraform
+        working-directory: TP1/infra/terraform
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -174,5 +179,6 @@ jobs:
           TF_VAR_deploy_enabled: "true"
           TF_VAR_deploy_mode: "self_hosted_local"
           TF_VAR_deploy_version: ${{ github.sha }}
+          TF_VAR_repo_root: ${{ github.workspace }}/TP1
           TF_VAR_app_env_content: ${{ secrets.DEPLOY_APP_ENV }}
         run: terraform apply -auto-approve
