@@ -1,4 +1,4 @@
-FROM node:26-alpine3.22 AS build
+FROM node:26.2.0-alpine3.23 AS build
 WORKDIR /app
 
 ARG VITE_API_BASE_URL=http://localhost:8080
@@ -10,7 +10,7 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-FROM nginx:1.31.0-alpine
+FROM nginx:1.31.0-alpine3.23
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

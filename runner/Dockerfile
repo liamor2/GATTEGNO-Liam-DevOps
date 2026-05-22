@@ -1,7 +1,8 @@
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
-ARG RUNNER_VERSION=2.327.1
+ARG RUNNER_VERSION=2.334.0
 ARG TARGETARCH=amd64
+ARG RUNNER_ARCH=x64
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV RUNNER_ALLOW_RUNASROOT=1
@@ -23,7 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nodejs \
     npm \
     maven \
-    openjdk-21-jdk \
+    openjdk-25-jdk \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg \
@@ -34,7 +35,7 @@ RUN curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/sh
 
 WORKDIR /actions-runner
 
-RUN curl -fsSL -o actions-runner.tar.gz "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-${TARGETARCH}-${RUNNER_VERSION}.tar.gz" \
+RUN curl -fsSL -o actions-runner.tar.gz "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz" \
     && tar xzf actions-runner.tar.gz \
     && rm actions-runner.tar.gz \
     && ./bin/installdependencies.sh
