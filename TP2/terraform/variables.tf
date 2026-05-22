@@ -1,65 +1,64 @@
-variable "linux_host" {
-  type        = string
-  description = "Linux target VM address."
+variable "targets" {
+  type = map(object({
+    enabled     = optional(bool, true)
+    os          = string
+    host        = string
+    user        = string
+    port        = optional(number)
+    auth_ref    = optional(string)
+    deploy_path = optional(string)
+    ports = optional(object({
+      frontend   = optional(number, 5173)
+      backend    = optional(number, 8080)
+      prometheus = optional(number, 9090)
+      grafana    = optional(number, 3000)
+    }), {})
+  }))
+  description = "Managed VM targets. Add, remove, or disable entries to change deployment targets."
+
+  validation {
+    condition = alltrue([
+      for target in values(var.targets) : contains(["linux", "windows"], lower(target.os))
+    ])
+    error_message = "Each target os must be either linux or windows."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, target in var.targets : can(regex("^[A-Za-z0-9_-]+$", name))
+    ])
+    error_message = "Target names may contain only letters, numbers, underscores, and hyphens."
+  }
 }
 
-variable "linux_user" {
-  type        = string
-  description = "SSH user for the Linux target VM."
-  default     = "ubuntu"
-}
-
-variable "linux_ssh_port" {
-  type        = number
-  description = "SSH port for the Linux target VM."
-  default     = 22
-}
-
-variable "linux_ssh_private_key_file" {
-  type        = string
-  description = "Path to the Linux SSH private key file inside the pipeline workspace."
-  default     = "/workspace/TP2/generated/linux_id_rsa"
-}
-
-variable "linux_deploy_path" {
-  type        = string
-  description = "Directory where TP1 is deployed on the Linux VM."
-  default     = "/opt/clicktracker/TP1"
-}
-
-variable "windows_host" {
-  type        = string
-  description = "Windows target VM address."
-}
-
-variable "windows_user" {
-  type        = string
-  description = "WinRM user for the Windows target VM."
-  default     = "Administrator"
-}
-
-variable "windows_winrm_port" {
-  type        = number
-  description = "WinRM HTTPS port for the Windows target VM."
-  default     = 5986
-}
-
-variable "windows_deploy_path" {
-  type        = string
-  description = "Directory where TP1 is deployed on the Windows VM."
-  default     = "C:\\clicktracker\\TP1"
+variable "enforce_required_target_os" {
+  type        = bool
+  description = "Require at least one enabled Linux target and one enabled Windows target for grading."
+  default     = true
 }
 
 variable "timezone_first" {
   type        = string
-  description = "First timezone applied and verified by Ansible."
+  description = "First Linux timezone applied and verified by Ansible."
   default     = "Europe/Paris"
 }
 
 variable "timezone_second" {
   type        = string
-  description = "Second timezone applied and verified by Ansible."
+  description = "Second Linux timezone applied and verified by Ansible."
   default     = "Africa/Abidjan"
+}
+
+variable "windows_timezone_first" {
+  type        = string
+  description = "First Windows timezone ID applied and verified by Ansible."
+  default     = "Romance Standard Time"
+}
+
+variable "windows_timezone_second" {
+  type        = string
+  description = "Second Windows timezone ID applied and verified by Ansible."
+  default     = "Greenwich Standard Time"
 }
 
 variable "cloud_ready_providers" {

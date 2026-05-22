@@ -62,16 +62,20 @@
 - name: Prepare Windows VM and deploy TP1
   hosts: windows_targets
   gather_facts: false
+  vars:
+    windows_staging_dir: "/tmp/tp2-windows-tp1-{{ inventory_hostname }}"
+    windows_staging_zip: "/tmp/tp2-windows-tp1-{{ inventory_hostname }}.zip"
+    windows_app_env: "/tmp/tp2-windows-app-{{ inventory_hostname }}.env"
   tasks:
     - name: Remove previous local Windows staging directory
       ansible.builtin.file:
-        path: /tmp/tp2-windows-tp1
+        path: "{{ windows_staging_dir }}"
         state: absent
       delegate_to: localhost
 
     - name: Create local Windows staging directory
       ansible.builtin.file:
-        path: /tmp/tp2-windows-tp1
+        path: "{{ windows_staging_dir }}"
         state: directory
         mode: "0755"
       delegate_to: localhost
@@ -87,14 +91,14 @@
           --exclude=frontend/playwright-report
           --exclude=frontend/test-results
           --exclude=backend/target
-          {{ tp2_tp1_source }}/ /tmp/tp2-windows-tp1/
+          {{ tp2_tp1_source }}/ {{ windows_staging_dir }}/
       changed_when: true
       delegate_to: localhost
 
     - name: Create clean TP1 zip for Windows transfer
       ansible.builtin.shell:
-        cmd: zip -qr /tmp/tp2-windows-tp1.zip .
-        chdir: /tmp/tp2-windows-tp1
+        cmd: "zip -qr {{ windows_staging_zip }} ."
+        chdir: "{{ windows_staging_dir }}"
       changed_when: true
       delegate_to: localhost
 
@@ -105,7 +109,7 @@
 
     - name: Copy clean TP1 zip to Windows target
       ansible.windows.win_copy:
-        src: /tmp/tp2-windows-tp1.zip
+        src: "{{ windows_staging_zip }}"
         dest: 'C:\Windows\Temp\tp2-windows-tp1.zip'
 
     - name: Empty Windows deployment directory
@@ -127,13 +131,13 @@
     - name: Render Windows app environment locally
       ansible.builtin.template:
         src: ../templates/app.env.j2
-        dest: /tmp/tp2-windows-app.env
+        dest: "{{ windows_app_env }}"
         mode: "0600"
       delegate_to: localhost
 
     - name: Copy Windows app environment
       ansible.windows.win_copy:
-        src: /tmp/tp2-windows-app.env
+        src: "{{ windows_app_env }}"
         dest: "{{ tp2_deploy_path }}\\.env"
 
     - name: Verify Docker is available on Windows

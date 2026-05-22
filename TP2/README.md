@@ -1,8 +1,10 @@
 # TP2 - DevOps Infrastructure Automation With Terraform, Jinja2, and Ansible
 
-This practical work automates a two-target deployment of the TP1 Click Tracker application.
+This practical work automates a modular deployment of the TP1 Click Tracker application.
 It uses Docker where it is useful for repeatable tooling, and VMs where the grading rubric
-requires managed Linux and Windows targets.
+requires managed Linux and Windows targets. The default grading configuration requires at
+least one Linux VM and one Windows VM, but additional targets can be added or disabled from
+the target JSON configuration.
 
 ## Architecture
 
@@ -85,25 +87,56 @@ and less reliable to automate in a grading lab.
 Create these repository secrets:
 
 ```text
-TP2_LINUX_HOST
-TP2_LINUX_USER
-TP2_LINUX_SSH_PRIVATE_KEY
-TP2_WINDOWS_HOST
-TP2_WINDOWS_USER
-TP2_WINDOWS_PASSWORD
+TP2_TARGETS_JSON
+TP2_LINUX_SSH_KEYS_JSON
+TP2_WINDOWS_PASSWORDS_JSON
 ```
 
-Optional secrets:
+`TP2_TARGETS_JSON` uses the same shape as `TP2/targets.auto.tfvars.json.example`:
 
-```text
-TP2_LINUX_SSH_PORT
-TP2_WINDOWS_WINRM_PORT
+```json
+{
+  "targets": {
+    "linux1": {
+      "enabled": true,
+      "os": "linux",
+      "host": "192.0.2.10",
+      "user": "ubuntu",
+      "port": 22,
+      "auth_ref": "linux1",
+      "deploy_path": "/opt/clicktracker/TP1"
+    },
+    "windows1": {
+      "enabled": true,
+      "os": "windows",
+      "host": "192.0.2.20",
+      "user": "Administrator",
+      "port": 5986,
+      "auth_ref": "windows1",
+      "deploy_path": "C:\\clicktracker\\TP1"
+    }
+  }
+}
 ```
 
-Defaults:
+`TP2_LINUX_SSH_KEYS_JSON` maps each Linux target `auth_ref` to its private key:
 
-- Linux SSH port: `22`
-- Windows WinRM port: `5986`
+```json
+{
+  "linux1": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----"
+}
+```
+
+`TP2_WINDOWS_PASSWORDS_JSON` maps each Windows target `auth_ref` to its password:
+
+```json
+{
+  "windows1": "change-me"
+}
+```
+
+Add or remove a target by editing the `targets` map. To keep a target documented but
+temporarily exclude it from deployment, set `"enabled": false`.
 
 ## Pipeline Flow
 
@@ -119,6 +152,8 @@ Jobs:
 
 2. `terraform-inventory`
    - runs Terraform format, init, validate, plan, and metadata apply.
+   - writes `TP2/generated/targets.auto.tfvars.json` from `TP2_TARGETS_JSON`.
+   - writes per-target Linux SSH key files under `TP2/generated/keys/`.
    - exports `TP2/generated/targets.json`.
    - renders `TP2/generated/inventory.yml` using `TP2/templates/inventory.yml.j2`.
    - uploads generated inventory as a pipeline artifact.
@@ -147,12 +182,12 @@ To build the Ansible controller:
 docker compose -f TP2/docker-compose.yml build ansible-controller
 ```
 
-To render a sample inventory locally, copy `TP2/terraform/terraform.tfvars.example`
-to `TP2/terraform/terraform.tfvars`, adjust target addresses, then run:
+To render a sample inventory locally, copy `TP2/targets.auto.tfvars.json.example`
+to `TP2/targets.auto.tfvars.json`, adjust target addresses, then run:
 
 ```bash
 terraform -chdir=TP2/terraform init
-terraform -chdir=TP2/terraform apply -auto-approve
+terraform -chdir=TP2/terraform apply -var-file=../targets.auto.tfvars.json -auto-approve
 terraform -chdir=TP2/terraform output -json target_metadata > TP2/generated/targets.json
 docker compose -f TP2/docker-compose.yml run --rm ansible-controller \
   python3 TP2/scripts/render_inventory.py \
@@ -173,16 +208,12 @@ docker compose -f TP2/docker-compose.yml run --rm ansible-controller \
 
 ## Deployment Validation
 
-The pipeline validates:
+The pipeline validates these endpoints for every enabled target:
 
-- Linux target frontend: `http://LINUX_HOST:5173`
-- Linux target backend: `POST http://LINUX_HOST:8080/api/click`
-- Linux target Prometheus: `http://LINUX_HOST:9090/-/ready`
-- Linux target Grafana: `http://LINUX_HOST:3000/api/health`
-- Windows target frontend: `http://WINDOWS_HOST:5173`
-- Windows target backend: `POST http://WINDOWS_HOST:8080/api/click`
-- Windows target Prometheus: `http://WINDOWS_HOST:9090/-/ready`
-- Windows target Grafana: `http://WINDOWS_HOST:3000/api/health`
+- frontend: `http://TARGET_HOST:5173`
+- backend: `POST http://TARGET_HOST:8080/api/click`
+- Prometheus: `http://TARGET_HOST:9090/-/ready`
+- Grafana: `http://TARGET_HOST:3000/api/health`
 
 ## Stopping TP1
 
@@ -208,7 +239,7 @@ Recommended screenshots:
 5. Ansible facts output for controller, Linux VM, and Windows VM.
 6. Linux timezone verification logs.
 7. Windows timezone verification logs.
-8. TP1 validation logs for both targets.
+8. TP1 validation logs for every enabled target.
 
 ## Delivery Naming
 

@@ -1,9 +1,23 @@
-linux_host     = "192.0.2.10"
-linux_user     = "ubuntu"
-linux_ssh_port = 22
+targets = {
+  linux1 = {
+    enabled     = true
+    os          = "linux"
+    host        = "192.0.2.10"
+    user        = "ubuntu"
+    port        = 22
+    auth_ref    = "linux1"
+    deploy_path = "/opt/clicktracker/TP1"
+  }
 
-windows_host       = "192.0.2.20"
-windows_user       = "Administrator"
-windows_winrm_port = 5986
+  windows1 = {
+    enabled     = true
+    os          = "windows"
+    host        = "192.0.2.20"
+    user        = "Administrator"
+    port        = 5986
+    auth_ref    = "windows1"
+    deploy_path = "C:\\clicktracker\\TP1"
+  }
+}
 
 cloud_ready_providers = ["aws", "gcp", "azure", "alibaba"]

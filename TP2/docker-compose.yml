@@ -5,7 +5,7 @@ services:
     container_name: tp2-ansible-controller
     environment:
       ANSIBLE_HOST_KEY_CHECKING: "false"
-      TP2_WINDOWS_PASSWORD: ${TP2_WINDOWS_PASSWORD:-}
+      TP2_WINDOWS_PASSWORDS_JSON: ${TP2_WINDOWS_PASSWORDS_JSON:-{}}
     volumes:
       - ..:/workspace
     working_dir: /workspace
