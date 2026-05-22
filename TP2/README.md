@@ -1,45 +1,78 @@
-# TP2 - DevOps Infrastructure Automation With Terraform, Jinja2, and Ansible
+# TP2 Setup Guide - GitHub Actions, Terraform, Jinja2, and Ansible
 
-This practical work automates a modular deployment of the TP1 Click Tracker application.
-It uses Docker where it is useful for repeatable tooling, and VMs where the grading rubric
-requires managed Linux and Windows targets. The default grading configuration requires at
-least one Linux VM and one Windows VM, but additional targets can be added or disabled from
-the target JSON configuration.
+This folder contains the infrastructure automation project for TP2. It deploys the TP1 Click Tracker application to managed virtual machines using a self-hosted GitHub Actions runner, Terraform-generated metadata, a Jinja2-rendered Ansible inventory, and a Dockerized Ansible controller.
 
-## Architecture
+The setup is modular: targets are configured from JSON, so Linux and Windows VMs can be added, removed, or temporarily disabled without changing the Ansible playbooks.
+
+## What You Will Build
 
 ```text
-GitHub private repository
+GitHub repository
         |
         v
-Self-hosted GitHub Actions runner (exclusive executor, label: tp2)
-        |
-        +--> Dockerized Ansible controller
-        |       |
-        |       +--> Linux VM over SSH
-        |       |       - facts
-        |       |       - timezone changes
-        |       |       - Docker Compose deployment of TP1
-        |       |
-        |       +--> Windows VM over WinRM
-        |               - facts
-        |               - timezone changes
-        |               - Docker Compose deployment of TP1
+Self-hosted GitHub Actions runner
+labels: self-hosted, linux, x64, tp2
         |
         +--> Terraform metadata stage
+        |       - validates target configuration
+        |       - exports target metadata as JSON
+        |
+        +--> Jinja2 inventory rendering
+        |       - creates TP2/generated/inventory.yml
+        |
+        +--> Dockerized Ansible controller
                 |
-                +--> Jinja2 inventory rendering
+                +--> Linux VM over SSH
+                |       - fact gathering
+                |       - timezone management
+                |       - TP1 Docker Compose deployment
+                |
+                +--> Windows VM over WinRM
+                        - fact gathering
+                        - timezone management
+                        - TP1 Docker Compose deployment
 ```
 
-Cloud-ready placeholders are kept in Terraform through `cloud_ready_providers`
-for AWS, GCP, Azure, and Alibaba alignment. The current implementation does not
-create cloud resources; it prepares normalized target metadata for Ansible.
+For grading, keep at least one enabled Linux target and one enabled Windows target. Extra targets are supported.
 
-## Requirements
+## 1. Prepare The Runner Host
 
-### Self-hosted GitHub Actions runner
+Use a Linux machine as the self-hosted GitHub Actions runner. This machine is also the Docker host that runs the Ansible controller container.
 
-Register a self-hosted runner for this repository with these labels:
+Install these tools on the runner host:
+
+```bash
+docker --version
+docker compose version
+terraform version
+git --version
+```
+
+The runner host must be able to reach:
+
+- the Linux VM over SSH, usually port `22`
+- the Windows VM over WinRM HTTPS, usually port `5986`
+- the deployed TP1 service ports on each VM:
+  - frontend: `5173`
+  - backend: `8080`
+  - Prometheus: `9090`
+  - Grafana: `3000`
+
+## 2. Register The GitHub Actions Runner
+
+In GitHub, open the repository settings:
+
+```text
+Settings -> Actions -> Runners -> New self-hosted runner
+```
+
+Follow the Linux registration instructions and add this custom label:
+
+```text
+tp2
+```
+
+The final runner labels must include:
 
 ```text
 self-hosted
@@ -48,51 +81,80 @@ x64
 tp2
 ```
 
-The TP2 workflow uses only:
+This is important because the TP2 workflow only uses:
 
 ```yaml
 runs-on: [self-hosted, linux, x64, tp2]
 ```
 
-This proves the custom local runner is the exclusive pipeline executor.
+That proves the custom runner is the exclusive pipeline executor.
 
-### Linux target VM
+## 3. Prepare The Linux Target VM
 
 Recommended OS: Ubuntu Server.
 
-Required:
+Required setup:
 
-- SSH reachable from the runner host.
-- User with passwordless sudo.
-- Python 3 installed.
+- SSH is enabled.
+- The runner host can connect to the VM.
+- The SSH user has passwordless sudo.
+- Python 3 is installed.
 
-Ansible installs Docker Engine and Docker Compose plugin if they are missing.
+Example check from the runner host:
 
-### Windows target VM
+```bash
+ssh ubuntu@LINUX_VM_IP "python3 --version && sudo -n true"
+```
+
+Ansible installs these Linux dependencies if they are missing:
+
+- Docker Engine
+- Docker Compose plugin
+- Python 3
+- rsync
+
+Default TP1 deployment path:
+
+```text
+/opt/clicktracker/TP1
+```
+
+## 4. Prepare The Windows Target VM
 
 Recommended OS: Windows 11 or Windows Server.
 
-Required:
+Required setup:
 
-- WinRM HTTPS reachable from the runner host, default port `5986`.
-- Docker Desktop or Docker Engine already installed.
-- Docker configured in Linux-container mode.
+- WinRM HTTPS is enabled.
+- The runner host can reach WinRM, usually port `5986`.
+- Docker Desktop or Docker Engine is already installed.
+- Docker is configured for Linux containers.
 - The configured Windows user can run Docker commands.
 
-Docker Desktop installation is intentionally manual because it is interactive
-and less reliable to automate in a grading lab.
+Docker Desktop installation is intentionally manual because it is interactive and unreliable to automate in a lab environment.
 
-## GitHub Secrets
+On the Windows VM, verify Docker:
 
-Create these repository secrets:
-
-```text
-TP2_TARGETS_JSON
-TP2_LINUX_SSH_KEYS_JSON
-TP2_WINDOWS_PASSWORDS_JSON
+```powershell
+docker version
+docker compose version
 ```
 
-`TP2_TARGETS_JSON` uses the same shape as `TP2/targets.auto.tfvars.json.example`:
+Default TP1 deployment path:
+
+```text
+C:\clicktracker\TP1
+```
+
+## 5. Configure Targets
+
+Targets are described in Terraform variable JSON. For local work, copy the example file:
+
+```bash
+cp TP2/targets.auto.tfvars.json.example TP2/targets.auto.tfvars.json
+```
+
+Edit `TP2/targets.auto.tfvars.json` with your VM addresses and users:
 
 ```json
 {
@@ -119,15 +181,70 @@ TP2_WINDOWS_PASSWORDS_JSON
 }
 ```
 
-`TP2_LINUX_SSH_KEYS_JSON` maps each Linux target `auth_ref` to its private key:
+Target fields:
+
+- `enabled`: set to `false` to keep the target in the file but skip deployment.
+- `os`: must be `linux` or `windows`.
+- `host`: IP address or DNS name reachable from the runner.
+- `user`: SSH or WinRM username.
+- `port`: SSH port for Linux, WinRM HTTPS port for Windows.
+- `auth_ref`: key used to find credentials in the GitHub secrets.
+- `deploy_path`: directory where TP1 is copied on the VM.
+
+To add another Linux VM, add another entry:
 
 ```json
-{
-  "linux1": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----"
+"linux2": {
+  "enabled": true,
+  "os": "linux",
+  "host": "192.0.2.11",
+  "user": "debian",
+  "port": 22,
+  "auth_ref": "linux2",
+  "deploy_path": "/opt/clicktracker/TP1"
 }
 ```
 
-`TP2_WINDOWS_PASSWORDS_JSON` maps each Windows target `auth_ref` to its password:
+## 6. Configure GitHub Secrets
+
+Create these repository secrets:
+
+```text
+TP2_TARGETS_JSON
+TP2_LINUX_SSH_KEYS_JSON
+TP2_WINDOWS_PASSWORDS_JSON
+```
+
+Open:
+
+```text
+Settings -> Secrets and variables -> Actions -> New repository secret
+```
+
+### `TP2_TARGETS_JSON`
+
+Use the same content as `TP2/targets.auto.tfvars.json`, adjusted for your real VMs.
+
+### `TP2_LINUX_SSH_KEYS_JSON`
+
+This maps Linux target `auth_ref` values to private SSH keys.
+
+Example:
+
+```json
+{
+  "linux1": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----",
+  "linux2": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----"
+}
+```
+
+If several Linux targets use the same SSH key, they can share the same `auth_ref`.
+
+### `TP2_WINDOWS_PASSWORDS_JSON`
+
+This maps Windows target `auth_ref` values to passwords.
+
+Example:
 
 ```json
 {
@@ -135,60 +252,37 @@ TP2_WINDOWS_PASSWORDS_JSON
 }
 ```
 
-Add or remove a target by editing the `targets` map. To keep a target documented but
-temporarily exclude it from deployment, set `"enabled": false`.
+Secrets are not stored in the generated inventory artifact. The workflow rewrites Linux key files during each job and reads Windows passwords from the secret JSON at Ansible runtime.
 
-## Pipeline Flow
+## 7. Run Local Static Checks
 
-The workflow is `.github/workflows/tp2-automation.yml`.
-
-It runs when `TP2/**`, `TP1/**`, or the workflow itself changes.
-
-Jobs:
-
-1. `runner-proof`
-   - prints runner name, OS, architecture, hostname, workspace, and repository.
-   - this is the screenshot proof that the custom self-hosted runner executed the job.
-
-2. `terraform-inventory`
-   - runs Terraform format, init, validate, plan, and metadata apply.
-   - writes `TP2/generated/targets.auto.tfvars.json` from `TP2_TARGETS_JSON`.
-   - writes per-target Linux SSH key files under `TP2/generated/keys/`.
-   - exports `TP2/generated/targets.json`.
-   - renders `TP2/generated/inventory.yml` using `TP2/templates/inventory.yml.j2`.
-   - uploads generated inventory as a pipeline artifact.
-
-3. `ansible-automation`
-   - runs Ansible inside the Dockerized controller.
-   - syntax-checks the full playbook.
-   - gathers facts on controller, Linux VM, and Windows VM.
-   - changes Linux and Windows timezones to Europe/Paris, verifies them, then changes them to Africa/Abidjan, and verifies again.
-   - deploys TP1 to both target VMs.
-   - validates frontend, backend, Prometheus, and Grafana endpoints.
-
-## Local Static Checks
-
-From the repository root:
+From the repository root, validate Docker Compose:
 
 ```bash
 docker compose -f TP2/docker-compose.yml config
-terraform -chdir=TP2/terraform fmt -check
-terraform -chdir=TP2/terraform validate
 ```
 
-To build the Ansible controller:
+Validate Terraform:
+
+```bash
+terraform -chdir=TP2/terraform fmt -check
+terraform -chdir=TP2/terraform init
+terraform -chdir=TP2/terraform validate
+terraform -chdir=TP2/terraform plan -var-file=../targets.auto.tfvars.json
+```
+
+Build the Ansible controller:
 
 ```bash
 docker compose -f TP2/docker-compose.yml build ansible-controller
 ```
 
-To render a sample inventory locally, copy `TP2/targets.auto.tfvars.json.example`
-to `TP2/targets.auto.tfvars.json`, adjust target addresses, then run:
+Generate the inventory locally:
 
 ```bash
-terraform -chdir=TP2/terraform init
 terraform -chdir=TP2/terraform apply -var-file=../targets.auto.tfvars.json -auto-approve
 terraform -chdir=TP2/terraform output -json target_metadata > TP2/generated/targets.json
+
 docker compose -f TP2/docker-compose.yml run --rm ansible-controller \
   python3 TP2/scripts/render_inventory.py \
   TP2/generated/targets.json \
@@ -196,9 +290,10 @@ docker compose -f TP2/docker-compose.yml run --rm ansible-controller \
   TP2/generated/inventory.yml
 ```
 
-Then syntax-check:
+Run an Ansible syntax check:
 
 ```bash
+TP2_WINDOWS_PASSWORDS_JSON='{"windows1":"dummy"}' \
 docker compose -f TP2/docker-compose.yml run --rm ansible-controller \
   ansible-playbook \
   -i TP2/generated/inventory.yml \
@@ -206,18 +301,101 @@ docker compose -f TP2/docker-compose.yml run --rm ansible-controller \
   --syntax-check
 ```
 
-## Deployment Validation
+For a real local deployment, replace the dummy password JSON with the correct Windows password mapping and make sure Linux SSH key files exist under:
+
+```text
+TP2/generated/keys/AUTH_REF.pem
+```
+
+## 8. Run The GitHub Actions Pipeline
+
+The workflow file is:
+
+```text
+.github/workflows/tp2-automation.yml
+```
+
+It runs on:
+
+- pushes to `main`
+- pull requests
+- changes under `TP2/**`
+- changes under `TP1/**`
+- changes to the workflow itself
+
+The pipeline jobs are:
+
+1. `runner-proof`
+   - checks out the repository
+   - prints runner name, OS, architecture, hostname, workspace, and repository
+
+2. `terraform-inventory`
+   - writes target JSON from `TP2_TARGETS_JSON`
+   - writes Linux SSH key files from `TP2_LINUX_SSH_KEYS_JSON`
+   - runs Terraform format, init, validate, plan, and apply
+   - exports `TP2/generated/targets.json`
+   - renders `TP2/generated/inventory.yml` with Jinja2
+   - uploads the generated inventory artifact
+
+3. `ansible-automation`
+   - downloads the generated inventory artifact
+   - restores Linux SSH keys from secrets
+   - builds the Ansible controller
+   - runs Ansible syntax check
+   - gathers facts
+   - changes and verifies Linux and Windows timezones
+   - deploys TP1 with Docker Compose
+   - validates the deployed endpoints
+
+## 9. What Ansible Deploys
+
+For each enabled target, Ansible copies `TP1/` to the configured `deploy_path`.
+
+These generated or heavy folders are excluded:
+
+```text
+.git
+.env
+frontend/node_modules
+frontend/dist
+frontend/playwright-report
+frontend/test-results
+backend/target
+```
+
+Ansible renders a fresh `.env` file from:
+
+```text
+TP2/ansible/templates/app.env.j2
+```
+
+Then it runs Docker Compose on the target:
+
+```bash
+docker compose up -d --build --remove-orphans
+```
+
+## 10. Validate The Deployment
 
 The pipeline validates these endpoints for every enabled target:
 
-- frontend: `http://TARGET_HOST:5173`
-- backend: `POST http://TARGET_HOST:8080/api/click`
-- Prometheus: `http://TARGET_HOST:9090/-/ready`
-- Grafana: `http://TARGET_HOST:3000/api/health`
+```text
+GET  http://TARGET_HOST:5173
+POST http://TARGET_HOST:8080/api/click
+GET  http://TARGET_HOST:9090/-/ready
+GET  http://TARGET_HOST:3000/api/health
+```
 
-## Stopping TP1
+Grafana is available with the defaults rendered by `app.env.j2` unless you override them:
 
-After generating inventory, run:
+```text
+username: admin
+password: admin
+```
+
+## 11. Stop TP1 On The Targets
+
+After inventory generation, stop TP1 with:
 
 ```bash
 docker compose -f TP2/docker-compose.yml run --rm ansible-controller \
@@ -225,35 +403,3 @@ docker compose -f TP2/docker-compose.yml run --rm ansible-controller \
   -i TP2/generated/inventory.yml \
   TP2/ansible/playbooks/stop_tp1.yml
 ```
-
-## Expected Screenshot Proofs
-
-Store final evidence in `TP2/proof_of_execution/`.
-
-Recommended screenshots:
-
-1. GitHub repository runner settings showing the registered self-hosted runner and `tp2` label.
-2. Successful TP2 pipeline overview.
-3. `runner-proof` logs showing `RUNNER_NAME`, `RUNNER_OS`, hostname, and workspace.
-4. Terraform/Jinja2 stage logs showing generated `targets.json` and `inventory.yml`.
-5. Ansible facts output for controller, Linux VM, and Windows VM.
-6. Linux timezone verification logs.
-7. Windows timezone verification logs.
-8. TP1 validation logs for every enabled target.
-
-## Delivery Naming
-
-Use the exact filename required by the assignment, replacing the name fields:
-
-```text
-LASTNAME Firstname - DevOps M1-DEV1 2026 - 09-04-2026.zip
-```
-
-Include:
-
-- Git repository content.
-- `TP1/`
-- `TP2/`
-- `.github/workflows/`
-- `TP2/proof_of_execution/`
-- this README.
