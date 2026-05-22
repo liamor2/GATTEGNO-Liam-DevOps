@@ -1,4 +1,17 @@
 ---
+- name: Stop Traefik load balancer on runner host
+  hosts: controller
+  gather_facts: false
+  tasks:
+    - name: Stop Traefik stack
+      ansible.builtin.command: >
+        docker compose
+        --env-file generated/traefik/traefik.env
+        stop traefik
+      args:
+        chdir: "{{ tp2_project_root }}/TP2"
+      ignore_errors: true
+
 - name: Stop TP1 on Linux VM
   hosts: linux_targets
   gather_facts: false

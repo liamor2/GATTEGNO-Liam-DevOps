@@ -1,3 +1,16 @@
+load_balancer = {
+  enabled        = true
+  host           = "runner.local"
+  http_port      = 80
+  dashboard_port = 8088
+  hostnames = {
+    frontend   = "app.runner.local"
+    backend    = "api.runner.local"
+    prometheus = "prometheus.runner.local"
+    grafana    = "grafana.runner.local"
+  }
+}
+
 targets = {
   linux1 = {
     enabled     = true

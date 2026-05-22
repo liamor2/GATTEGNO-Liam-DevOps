@@ -55,7 +55,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Prepare generated directory
-        run: mkdir -p generated/keys
+        run: mkdir -p generated/keys generated/traefik
 
       - name: Write target configuration
         run: |
@@ -86,6 +86,12 @@ jobs:
       - name: Export Terraform target metadata
         run: terraform -chdir=terraform output -json target_metadata > generated/targets.json
 
+      - name: Render Traefik compose environment
+        run: >
+          python3 scripts/write_traefik_env.py
+          generated/targets.auto.tfvars.json
+          generated/traefik/traefik.env
+
       - name: Build Ansible controller
         run: docker compose build ansible-controller
 
@@ -97,9 +103,20 @@ jobs:
           TP2/templates/inventory.yml.j2
           TP2/generated/inventory.yml
 
+      - name: Render Traefik dynamic configuration from Jinja2
+        run: >
+          docker compose run --rm ansible-controller
+          python3 TP2/scripts/render_inventory.py
+          TP2/generated/targets.json
+          TP2/templates/traefik-dynamic.yml.j2
+          TP2/generated/traefik/dynamic.yml
+
       - name: Show generated inventory proof
         run: |
           sed -E 's/(ansible_password:).*/\1 REDACTED/' generated/inventory.yml
+
+      - name: Show generated Traefik proof
+        run: sed -n '1,220p' generated/traefik/dynamic.yml
 
       - name: Upload generated inventory artifact
         uses: actions/upload-artifact@v7
@@ -109,6 +126,8 @@ jobs:
             TP2/generated/targets.json
             TP2/generated/inventory.yml
             TP2/generated/targets.auto.tfvars.json
+            TP2/generated/traefik/dynamic.yml
+            TP2/generated/traefik/traefik.env
 
   ansible-automation:
     name: Ansible facts timezone and TP1 deploy

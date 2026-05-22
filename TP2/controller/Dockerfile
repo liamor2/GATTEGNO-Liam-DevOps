@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ansible-core \
     ca-certificates \
     curl \
+    docker.io \
+    docker-compose-v2 \
     git \
     iputils-ping \
     jq \

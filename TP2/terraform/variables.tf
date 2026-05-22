@@ -37,6 +37,23 @@ variable "enforce_required_target_os" {
   default     = true
 }
 
+variable "load_balancer" {
+  type = object({
+    enabled        = optional(bool, true)
+    host           = optional(string, "localhost")
+    http_port      = optional(number, 80)
+    dashboard_port = optional(number, 8088)
+    hostnames = optional(object({
+      frontend   = optional(string, "app.localhost")
+      backend    = optional(string, "api.localhost")
+      prometheus = optional(string, "prometheus.localhost")
+      grafana    = optional(string, "grafana.localhost")
+    }), {})
+  })
+  description = "Traefik load balancer settings running on the TP2 runner host."
+  default     = {}
+}
+
 variable "timezone_first" {
   type        = string
   description = "First Linux timezone applied and verified by Ansible."

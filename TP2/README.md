@@ -1,8 +1,8 @@
 # TP2 Setup Guide - GitHub Actions, Terraform, Jinja2, and Ansible
 
-This folder contains the infrastructure automation project for TP2. It deploys the TP1 Click Tracker application to managed virtual machines using a self-hosted GitHub Actions runner, Terraform-generated metadata, a Jinja2-rendered Ansible inventory, and a Dockerized Ansible controller.
+This folder contains the infrastructure automation project for TP2. It deploys the TP1 Click Tracker application to managed virtual machines using a self-hosted GitHub Actions runner, Terraform-generated metadata, Jinja2-rendered configuration, a Dockerized Ansible controller, and a Traefik load balancer.
 
-The setup is modular: targets are configured from JSON, so Linux and Windows VMs can be added, removed, or temporarily disabled without changing the Ansible playbooks.
+The setup is modular: targets and public hostnames are configured from JSON, so Linux and Windows VMs can be added, removed, or temporarily disabled without changing the Ansible playbooks or Traefik routes.
 
 ## What You Will Build
 
@@ -19,6 +19,7 @@ labels: self-hosted, linux, x64, tp2
         |
         +--> Jinja2 inventory rendering
         |       - creates TP2/generated/inventory.yml
+        |       - creates TP2/generated/traefik/dynamic.yml
         |
         +--> Dockerized Ansible controller
                 |
@@ -31,6 +32,11 @@ labels: self-hosted, linux, x64, tp2
                         - fact gathering
                         - timezone management
                         - TP1 Docker Compose deployment
+                |
+                +--> Traefik on the runner host
+                        - middleware
+                        - load balancing
+                        - hostname routing to all enabled targets
 ```
 
 For grading, keep at least one enabled Linux target and one enabled Windows target. Extra targets are supported.
@@ -57,6 +63,17 @@ The runner host must be able to reach:
   - backend: `8080`
   - Prometheus: `9090`
   - Grafana: `3000`
+
+The runner host also exposes Traefik:
+
+- routed HTTP traffic: default port `80`
+- Traefik dashboard: default port `8088`
+
+Create DNS records or local `/etc/hosts` entries so the modular Traefik hostnames point to the runner host. For a lab setup, this is enough:
+
+```text
+RUNNER_HOST_IP app.runner.local api.runner.local prometheus.runner.local grafana.runner.local
+```
 
 ## 2. Register The GitHub Actions Runner
 
@@ -158,6 +175,18 @@ Edit `TP2/targets.auto.tfvars.json` with your VM addresses and users:
 
 ```json
 {
+  "load_balancer": {
+    "enabled": true,
+    "host": "runner.local",
+    "http_port": 80,
+    "dashboard_port": 8088,
+    "hostnames": {
+      "frontend": "app.runner.local",
+      "backend": "api.runner.local",
+      "prometheus": "prometheus.runner.local",
+      "grafana": "grafana.runner.local"
+    }
+  },
   "targets": {
     "linux1": {
       "enabled": true,
@@ -180,6 +209,14 @@ Edit `TP2/targets.auto.tfvars.json` with your VM addresses and users:
   }
 }
 ```
+
+Load balancer fields:
+
+- `enabled`: set to `false` to skip Traefik startup and Traefik route validation.
+- `host`: runner host address used by Ansible validation, for example `runner.local` or the runner IP.
+- `http_port`: public Traefik HTTP port, default `80`.
+- `dashboard_port`: public Traefik dashboard port, default `8088`.
+- `hostnames`: public hostnames routed by Traefik.
 
 Target fields:
 
@@ -288,6 +325,16 @@ docker compose -f TP2/docker-compose.yml run --rm ansible-controller \
   TP2/generated/targets.json \
   TP2/templates/inventory.yml.j2 \
   TP2/generated/inventory.yml
+
+python3 TP2/scripts/write_traefik_env.py \
+  TP2/targets.auto.tfvars.json \
+  TP2/generated/traefik/traefik.env
+
+docker compose -f TP2/docker-compose.yml run --rm ansible-controller \
+  python3 TP2/scripts/render_inventory.py \
+  TP2/generated/targets.json \
+  TP2/templates/traefik-dynamic.yml.j2 \
+  TP2/generated/traefik/dynamic.yml
 ```
 
 Run an Ansible syntax check:
@@ -335,6 +382,8 @@ The pipeline jobs are:
    - runs Terraform format, init, validate, plan, and apply
    - exports `TP2/generated/targets.json`
    - renders `TP2/generated/inventory.yml` with Jinja2
+   - renders `TP2/generated/traefik/dynamic.yml` with Jinja2
+   - writes `TP2/generated/traefik/traefik.env` for Traefik ports
    - uploads the generated inventory artifact
 
 3. `ansible-automation`
@@ -345,7 +394,8 @@ The pipeline jobs are:
    - gathers facts
    - changes and verifies Linux and Windows timezones
    - deploys TP1 with Docker Compose
-   - validates the deployed endpoints
+   - starts Traefik on the runner host
+   - validates direct target endpoints and Traefik-routed endpoints
 
 ## 9. What Ansible Deploys
 
@@ -369,10 +419,18 @@ Ansible renders a fresh `.env` file from:
 TP2/ansible/templates/app.env.j2
 ```
 
-Then it runs Docker Compose on the target:
+When Traefik is enabled, the generated `.env` points the frontend build at the load-balanced backend hostname and allows the load-balanced frontend origin in backend CORS.
+
+Then Ansible runs Docker Compose on the target:
 
 ```bash
 docker compose up -d --build --remove-orphans
+```
+
+After every target is deployed, Ansible starts Traefik on the runner host with:
+
+```bash
+docker compose --env-file generated/traefik/traefik.env up -d traefik
 ```
 
 ## 10. Validate The Deployment
@@ -384,6 +442,21 @@ GET  http://TARGET_HOST:5173
 POST http://TARGET_HOST:8080/api/click
 GET  http://TARGET_HOST:9090/-/ready
 GET  http://TARGET_HOST:3000/api/health
+```
+
+It also validates these Traefik routes through the configured hostnames:
+
+```text
+GET  http://FRONTEND_HOSTNAME/
+POST http://BACKEND_HOSTNAME/api/click
+GET  http://PROMETHEUS_HOSTNAME/-/ready
+GET  http://GRAFANA_HOSTNAME/api/health
+```
+
+The Traefik dashboard is available on:
+
+```text
+http://LOAD_BALANCER_HOST:8088/dashboard/
 ```
 
 Grafana is available with the defaults rendered by `app.env.j2` unless you override them:
@@ -403,3 +476,5 @@ docker compose -f TP2/docker-compose.yml run --rm ansible-controller \
   -i TP2/generated/inventory.yml \
   TP2/ansible/playbooks/stop_tp1.yml
 ```
+
+This stops Traefik on the runner host and stops TP1 on every enabled target.

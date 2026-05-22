@@ -1,0 +1,86 @@
+http:
+  routers:
+    tp2-frontend:
+      rule: "Host(`{{ load_balancer.hostnames.frontend }}`)"
+      entryPoints:
+        - web
+      middlewares:
+        - tp2-compress
+        - tp2-security-headers
+      service: tp2-frontend
+    tp2-backend:
+      rule: "Host(`{{ load_balancer.hostnames.backend }}`)"
+      entryPoints:
+        - web
+      middlewares:
+        - tp2-compress
+        - tp2-security-headers
+      service: tp2-backend
+    tp2-prometheus:
+      rule: "Host(`{{ load_balancer.hostnames.prometheus }}`)"
+      entryPoints:
+        - web
+      middlewares:
+        - tp2-compress
+        - tp2-security-headers
+      service: tp2-prometheus
+    tp2-grafana:
+      rule: "Host(`{{ load_balancer.hostnames.grafana }}`)"
+      entryPoints:
+        - web
+      middlewares:
+        - tp2-compress
+        - tp2-security-headers
+      service: tp2-grafana
+
+  middlewares:
+    tp2-compress:
+      compress: {}
+    tp2-security-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+
+  services:
+    tp2-frontend:
+      loadBalancer:
+        healthCheck:
+          path: /
+          interval: 10s
+          timeout: 3s
+        servers:
+{% for name, backend in load_balancer.backends.frontend | dictsort %}
+          - url: "{{ backend.url }}"
+{% endfor %}
+    tp2-backend:
+      loadBalancer:
+        healthCheck:
+          path: /actuator/health
+          interval: 10s
+          timeout: 3s
+        servers:
+{% for name, backend in load_balancer.backends.backend | dictsort %}
+          - url: "{{ backend.url }}"
+{% endfor %}
+    tp2-prometheus:
+      loadBalancer:
+        healthCheck:
+          path: /-/ready
+          interval: 10s
+          timeout: 3s
+        servers:
+{% for name, backend in load_balancer.backends.prometheus | dictsort %}
+          - url: "{{ backend.url }}"
+{% endfor %}
+    tp2-grafana:
+      loadBalancer:
+        healthCheck:
+          path: /api/health
+          interval: 10s
+          timeout: 3s
+        servers:
+{% for name, backend in load_balancer.backends.grafana | dictsort %}
+          - url: "{{ backend.url }}"
+{% endfor %}

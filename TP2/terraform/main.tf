@@ -38,6 +38,46 @@ locals {
     if lower(target.os) == "windows"
   }
 
+  all_managed_targets = merge(local.linux_targets, local.windows_targets)
+
+  load_balancer_http_port_suffix = var.load_balancer.http_port == 80 ? "" : ":${var.load_balancer.http_port}"
+
+  load_balancer = {
+    enabled        = var.load_balancer.enabled
+    host           = var.load_balancer.host
+    http_port      = var.load_balancer.http_port
+    dashboard_port = var.load_balancer.dashboard_port
+    hostnames      = var.load_balancer.hostnames
+    urls = {
+      frontend   = "http://${var.load_balancer.hostnames.frontend}${local.load_balancer_http_port_suffix}"
+      backend    = "http://${var.load_balancer.hostnames.backend}${local.load_balancer_http_port_suffix}"
+      prometheus = "http://${var.load_balancer.hostnames.prometheus}${local.load_balancer_http_port_suffix}"
+      grafana    = "http://${var.load_balancer.hostnames.grafana}${local.load_balancer_http_port_suffix}"
+    }
+    backends = {
+      frontend = {
+        for name, target in local.all_managed_targets : name => {
+          url = "http://${target.host}:${target.ports.frontend}"
+        }
+      }
+      backend = {
+        for name, target in local.all_managed_targets : name => {
+          url = "http://${target.host}:${target.ports.backend}"
+        }
+      }
+      prometheus = {
+        for name, target in local.all_managed_targets : name => {
+          url = "http://${target.host}:${target.ports.prometheus}"
+        }
+      }
+      grafana = {
+        for name, target in local.all_managed_targets : name => {
+          url = "http://${target.host}:${target.ports.grafana}"
+        }
+      }
+    }
+  }
+
   required_target_os_is_present = (
     !var.enforce_required_target_os ||
     (length(local.linux_targets) > 0 && length(local.windows_targets) > 0)
@@ -51,6 +91,7 @@ locals {
     }
     linux_targets   = local.linux_targets
     windows_targets = local.windows_targets
+    load_balancer   = local.load_balancer
     automation = {
       timezone_first          = var.timezone_first
       timezone_second         = var.timezone_second

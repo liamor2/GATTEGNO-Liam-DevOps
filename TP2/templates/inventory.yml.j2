@@ -6,6 +6,12 @@ all:
     tp2_windows_timezone_first: "{{ automation.windows_timezone_first }}"
     tp2_windows_timezone_second: "{{ automation.windows_timezone_second }}"
     tp2_cloud_ready_providers: {{ automation.cloud_ready_providers | tojson }}
+    tp2_load_balancer_enabled: {{ load_balancer.enabled | tojson }}
+    tp2_load_balancer_host: "{{ load_balancer.host }}"
+    tp2_load_balancer_http_port: {{ load_balancer.http_port }}
+    tp2_load_balancer_dashboard_port: {{ load_balancer.dashboard_port }}
+    tp2_load_balancer_hostnames: {{ load_balancer.hostnames | tojson }}
+    tp2_load_balancer_urls: {{ load_balancer.urls | tojson }}
     tp2_project_root: /workspace
     tp2_tp1_source: /workspace/TP1
   children:
