@@ -1,11 +1,19 @@
+import type { CSSProperties } from "react";
 import { useState } from "react";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+
+type ClickEvent = {
+  id: number;
+  pressedAt: string;
+  ipAddress: string;
+};
 
 export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [event, setEvent] = useState(null);
+  const [event, setEvent] = useState<ClickEvent | null>(null);
 
   const onPress = async () => {
     setLoading(true);
@@ -13,14 +21,14 @@ export default function App() {
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/click`, {
-        method: "POST"
+        method: "POST",
       });
 
       if (!response.ok) {
         throw new Error(`Request failed with status ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as ClickEvent;
       setEvent(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
@@ -33,7 +41,12 @@ export default function App() {
     <main style={styles.main}>
       <section style={styles.panel}>
         <h1 style={styles.title}>Click Tracker</h1>
-        <button style={styles.button} onClick={onPress} disabled={loading}>
+        <button
+          type="button"
+          style={styles.button}
+          onClick={onPress}
+          disabled={loading}
+        >
           {loading ? "Saving..." : "Press me"}
         </button>
 
@@ -49,12 +62,12 @@ export default function App() {
   );
 }
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   main: {
     minHeight: "100vh",
     display: "grid",
     placeItems: "center",
-    padding: "1rem"
+    padding: "1rem",
   },
   panel: {
     width: "min(640px, 100%)",
@@ -62,11 +75,11 @@ const styles = {
     borderRadius: "16px",
     padding: "2rem",
     boxShadow: "0 20px 40px rgba(30, 64, 175, 0.12)",
-    textAlign: "center"
+    textAlign: "center",
   },
   title: {
     marginTop: 0,
-    marginBottom: "1.5rem"
+    marginBottom: "1.5rem",
   },
   button: {
     width: "100%",
@@ -79,17 +92,17 @@ const styles = {
     fontWeight: 700,
     color: "white",
     background: "linear-gradient(135deg, #1d4ed8, #2563eb)",
-    boxShadow: "0 12px 24px rgba(37,99,235,0.35)"
+    boxShadow: "0 12px 24px rgba(37,99,235,0.35)",
   },
   error: {
     marginTop: "1rem",
     color: "#b91c1c",
-    fontWeight: 600
+    fontWeight: 600,
   },
   result: {
     marginTop: "1rem",
     color: "#065f46",
     fontWeight: 600,
-    wordBreak: "break-word"
-  }
+    wordBreak: "break-word",
+  },
 };

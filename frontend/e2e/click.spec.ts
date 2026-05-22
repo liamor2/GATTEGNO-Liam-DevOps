@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("pressing the button stores and displays click event", async ({ page }) => {
+test("pressing the button stores and displays click event", async ({
+  page,
+}) => {
   await page.goto("/");
 
   const button = page.getByRole("button", { name: "Press me" });
