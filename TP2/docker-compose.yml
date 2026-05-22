@@ -1,0 +1,11 @@
+services:
+  ansible-controller:
+    build:
+      context: ./controller
+    container_name: tp2-ansible-controller
+    environment:
+      ANSIBLE_HOST_KEY_CHECKING: "false"
+      TP2_WINDOWS_PASSWORD: ${TP2_WINDOWS_PASSWORD:-}
+    volumes:
+      - ..:/workspace
+    working_dir: /workspace

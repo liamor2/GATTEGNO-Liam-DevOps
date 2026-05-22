@@ -1,0 +1,9 @@
+---
+- name: Fact gathering proof
+  ansible.builtin.import_playbook: facts.yml
+
+- name: Cross-platform timezone automation
+  ansible.builtin.import_playbook: timezone.yml
+
+- name: TP1 deployment automation
+  ansible.builtin.import_playbook: deploy_tp1.yml

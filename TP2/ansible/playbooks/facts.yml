@@ -1,0 +1,40 @@
+---
+- name: Gather controller facts
+  hosts: controller
+  gather_facts: true
+  tasks:
+    - name: Show controller proof
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          system: "{{ ansible_system }}"
+          distribution: "{{ ansible_distribution | default('n/a') }}"
+          cloud_ready_providers: "{{ tp2_cloud_ready_providers }}"
+
+- name: Gather Linux target facts
+  hosts: linux_targets
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Show Linux target proof
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          address: "{{ ansible_host }}"
+          distribution: "{{ ansible_distribution }}"
+          version: "{{ ansible_distribution_version }}"
+
+- name: Gather Windows target facts
+  hosts: windows_targets
+  gather_facts: false
+  tasks:
+    - name: Gather Windows facts
+      ansible.windows.setup:
+
+    - name: Show Windows target proof
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          address: "{{ ansible_host }}"
+          os_name: "{{ ansible_os_name }}"
+          distribution: "{{ ansible_distribution }}"

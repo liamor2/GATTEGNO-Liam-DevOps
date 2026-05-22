@@ -1,0 +1,22 @@
+---
+- name: Stop TP1 on Linux VM
+  hosts: linux_targets
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Stop Linux TP1 stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ tp2_deploy_path }}"
+        state: absent
+        remove_volumes: true
+      ignore_errors: true
+
+- name: Stop TP1 on Windows VM
+  hosts: windows_targets
+  gather_facts: false
+  tasks:
+    - name: Stop Windows TP1 stack
+      ansible.windows.win_command: docker compose down -v
+      args:
+        chdir: "{{ tp2_deploy_path }}"
+      ignore_errors: true

@@ -1,0 +1,9 @@
+linux_host     = "192.0.2.10"
+linux_user     = "ubuntu"
+linux_ssh_port = 22
+
+windows_host       = "192.0.2.20"
+windows_user       = "Administrator"
+windows_winrm_port = 5986
+
+cloud_ready_providers = ["aws", "gcp", "azure", "alibaba"]

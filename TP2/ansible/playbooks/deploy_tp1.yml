@@ -1,0 +1,198 @@
+---
+- name: Prepare Linux VM and deploy TP1
+  hosts: linux_targets
+  gather_facts: true
+  become: true
+  vars:
+    linux_parent_dir: "{{ tp2_deploy_path | dirname }}"
+  tasks:
+    - name: Install Docker dependencies on Linux
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - docker.io
+          - docker-compose-v2
+          - python3
+          - rsync
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Ensure Docker service is running on Linux
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Create Linux deployment parent directory
+      ansible.builtin.file:
+        path: "{{ linux_parent_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Sync TP1 source to Linux target
+      ansible.posix.synchronize:
+        src: "{{ tp2_tp1_source }}/"
+        dest: "{{ tp2_deploy_path }}/"
+        delete: true
+        rsync_path: sudo rsync
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=.env"
+          - "--exclude=frontend/node_modules"
+          - "--exclude=frontend/dist"
+          - "--exclude=frontend/playwright-report"
+          - "--exclude=frontend/test-results"
+          - "--exclude=backend/target"
+
+    - name: Render Linux app environment
+      ansible.builtin.template:
+        src: ../templates/app.env.j2
+        dest: "{{ tp2_deploy_path }}/.env"
+        mode: "0600"
+
+    - name: Deploy TP1 on Linux
+      community.docker.docker_compose_v2:
+        project_src: "{{ tp2_deploy_path }}"
+        state: present
+        build: always
+        remove_orphans: true
+
+- name: Prepare Windows VM and deploy TP1
+  hosts: windows_targets
+  gather_facts: false
+  tasks:
+    - name: Remove previous local Windows staging directory
+      ansible.builtin.file:
+        path: /tmp/tp2-windows-tp1
+        state: absent
+      delegate_to: localhost
+
+    - name: Create local Windows staging directory
+      ansible.builtin.file:
+        path: /tmp/tp2-windows-tp1
+        state: directory
+        mode: "0755"
+      delegate_to: localhost
+
+    - name: Stage clean TP1 copy for Windows transfer
+      ansible.builtin.command:
+        cmd: >
+          rsync -a --delete
+          --exclude=.git
+          --exclude=.env
+          --exclude=frontend/node_modules
+          --exclude=frontend/dist
+          --exclude=frontend/playwright-report
+          --exclude=frontend/test-results
+          --exclude=backend/target
+          {{ tp2_tp1_source }}/ /tmp/tp2-windows-tp1/
+      changed_when: true
+      delegate_to: localhost
+
+    - name: Create clean TP1 zip for Windows transfer
+      ansible.builtin.shell:
+        cmd: zip -qr /tmp/tp2-windows-tp1.zip .
+        chdir: /tmp/tp2-windows-tp1
+      changed_when: true
+      delegate_to: localhost
+
+    - name: Ensure Windows deployment directory exists
+      ansible.windows.win_file:
+        path: "{{ tp2_deploy_path }}"
+        state: directory
+
+    - name: Copy clean TP1 zip to Windows target
+      ansible.windows.win_copy:
+        src: /tmp/tp2-windows-tp1.zip
+        dest: 'C:\Windows\Temp\tp2-windows-tp1.zip'
+
+    - name: Empty Windows deployment directory
+      ansible.windows.win_file:
+        path: "{{ tp2_deploy_path }}"
+        state: absent
+
+    - name: Recreate Windows deployment directory
+      ansible.windows.win_file:
+        path: "{{ tp2_deploy_path }}"
+        state: directory
+
+    - name: Extract clean TP1 zip on Windows target
+      community.windows.win_unzip:
+        src: 'C:\Windows\Temp\tp2-windows-tp1.zip'
+        dest: "{{ tp2_deploy_path }}"
+        delete_archive: true
+
+    - name: Render Windows app environment locally
+      ansible.builtin.template:
+        src: ../templates/app.env.j2
+        dest: /tmp/tp2-windows-app.env
+        mode: "0600"
+      delegate_to: localhost
+
+    - name: Copy Windows app environment
+      ansible.windows.win_copy:
+        src: /tmp/tp2-windows-app.env
+        dest: "{{ tp2_deploy_path }}\\.env"
+
+    - name: Verify Docker is available on Windows
+      ansible.windows.win_command: docker version
+      changed_when: false
+
+    - name: Deploy TP1 on Windows
+      ansible.windows.win_command: docker compose up -d --build --remove-orphans
+      args:
+        chdir: "{{ tp2_deploy_path }}"
+
+- name: Validate TP1 deployments
+  hosts: managed_targets
+  gather_facts: false
+  tasks:
+    - name: Wait for frontend
+      ansible.builtin.uri:
+        url: "{{ tp2_frontend_url }}"
+        status_code: 200
+      register: frontend_probe
+      until: frontend_probe.status == 200
+      retries: 30
+      delay: 5
+      delegate_to: localhost
+
+    - name: Validate backend click endpoint
+      ansible.builtin.uri:
+        url: "{{ tp2_backend_url }}/api/click"
+        method: POST
+        status_code: 200
+        return_content: true
+      register: backend_probe
+      delegate_to: localhost
+
+    - name: Wait for Prometheus readiness
+      ansible.builtin.uri:
+        url: "{{ tp2_prometheus_url }}/-/ready"
+        status_code: 200
+      register: prometheus_probe
+      until: prometheus_probe.status == 200
+      retries: 30
+      delay: 5
+      delegate_to: localhost
+
+    - name: Wait for Grafana health
+      ansible.builtin.uri:
+        url: "{{ tp2_grafana_url }}/api/health"
+        status_code: 200
+      register: grafana_probe
+      until: grafana_probe.status == 200
+      retries: 30
+      delay: 5
+      delegate_to: localhost
+
+    - name: Show deployment proof
+      ansible.builtin.debug:
+        msg:
+          target: "{{ inventory_hostname }}"
+          frontend: "{{ tp2_frontend_url }}"
+          backend_response: "{{ backend_probe.json | default({}) }}"
+          prometheus: "{{ tp2_prometheus_url }}"
+          grafana: "{{ tp2_grafana_url }}"

@@ -2,6 +2,7 @@ actions-runner
 TP1/actions-runner
 
 .codex
+__pycache__/
 
 *.tfstate
 *.tfstate.*
@@ -28,3 +29,12 @@ TP1/infra/terraform/.terraform.lock.hcl
 TP1/infra/terraform/tfplan
 TP1/frontend/playwright-report
 TP1/frontend/test-results
+TP2/generated/*
+!TP2/generated/.gitkeep
+!TP2/proof_of_execution/
+!TP2/proof_of_execution/.gitkeep
+TP2/terraform/.terraform
+TP2/terraform/.terraform.lock.hcl
+TP2/terraform/*.tfstate
+TP2/terraform/*.tfstate.*
+TP2/terraform/tfplan

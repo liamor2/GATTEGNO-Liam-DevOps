@@ -1,0 +1,52 @@
+---
+- name: Manage Linux timezone
+  hosts: linux_targets
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Apply first Linux timezone
+      community.general.timezone:
+        name: "{{ tp2_timezone_first }}"
+
+    - name: Verify first Linux timezone
+      ansible.builtin.command: timedatectl show --property=Timezone --value
+      register: linux_timezone_first
+      changed_when: false
+      failed_when: linux_timezone_first.stdout != tp2_timezone_first
+
+    - name: Apply second Linux timezone
+      community.general.timezone:
+        name: "{{ tp2_timezone_second }}"
+
+    - name: Verify second Linux timezone
+      ansible.builtin.command: timedatectl show --property=Timezone --value
+      register: linux_timezone_second
+      changed_when: false
+      failed_when: linux_timezone_second.stdout != tp2_timezone_second
+
+- name: Manage Windows timezone
+  hosts: windows_targets
+  gather_facts: false
+  vars:
+    windows_timezone_first: Romance Standard Time
+    windows_timezone_second: Greenwich Standard Time
+  tasks:
+    - name: Apply first Windows timezone
+      ansible.windows.win_timezone:
+        timezone: "{{ windows_timezone_first }}"
+
+    - name: Verify first Windows timezone
+      ansible.windows.win_command: tzutil /g
+      register: windows_timezone_first_result
+      changed_when: false
+      failed_when: windows_timezone_first_result.stdout | trim != windows_timezone_first
+
+    - name: Apply second Windows timezone
+      ansible.windows.win_timezone:
+        timezone: "{{ windows_timezone_second }}"
+
+    - name: Verify second Windows timezone
+      ansible.windows.win_command: tzutil /g
+      register: windows_timezone_second_result
+      changed_when: false
+      failed_when: windows_timezone_second_result.stdout | trim != windows_timezone_second

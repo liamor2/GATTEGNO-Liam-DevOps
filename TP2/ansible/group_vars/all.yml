@@ -1,0 +1,6 @@
+---
+tp2_postgres_db: clickdb
+tp2_postgres_user: clickuser
+tp2_postgres_password: clickpass
+tp2_grafana_admin_user: admin
+tp2_grafana_admin_password: admin

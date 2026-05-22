@@ -1,0 +1,48 @@
+---
+all:
+  vars:
+    tp2_timezone_first: "{{ automation.timezone_first }}"
+    tp2_timezone_second: "{{ automation.timezone_second }}"
+    tp2_cloud_ready_providers: {{ automation.cloud_ready_providers | tojson }}
+    tp2_project_root: /workspace
+    tp2_tp1_source: /workspace/TP1
+  children:
+    controller:
+      hosts:
+        ansible-controller:
+          ansible_connection: local
+    linux_targets:
+      hosts:
+        {{ linux.name }}:
+          ansible_host: "{{ linux.host }}"
+          ansible_user: "{{ linux.user }}"
+          ansible_port: {{ linux.ssh_port }}
+          ansible_connection: ssh
+          ansible_private_key_file: "{{ linux.ssh_private_key_file }}"
+          ansible_python_interpreter: /usr/bin/python3
+          tp2_target_os: linux
+          tp2_deploy_path: "{{ linux.deploy_path }}"
+          tp2_frontend_url: "http://{{ linux.host }}:{{ linux.ports.frontend }}"
+          tp2_backend_url: "http://{{ linux.host }}:{{ linux.ports.backend }}"
+          tp2_prometheus_url: "http://{{ linux.host }}:{{ linux.ports.prometheus }}"
+          tp2_grafana_url: "http://{{ linux.host }}:{{ linux.ports.grafana }}"
+    windows_targets:
+      hosts:
+        {{ windows.name }}:
+          ansible_host: "{{ windows.host }}"
+          ansible_user: "{{ windows.user }}"
+          ansible_password: "{{ '{{' }} lookup('env', 'TP2_WINDOWS_PASSWORD') {{ '}}' }}"
+          ansible_port: {{ windows.winrm_port }}
+          ansible_connection: winrm
+          ansible_winrm_transport: ntlm
+          ansible_winrm_server_cert_validation: ignore
+          tp2_target_os: windows
+          tp2_deploy_path: '{{ windows.deploy_path }}'
+          tp2_frontend_url: "http://{{ windows.host }}:{{ windows.ports.frontend }}"
+          tp2_backend_url: "http://{{ windows.host }}:{{ windows.ports.backend }}"
+          tp2_prometheus_url: "http://{{ windows.host }}:{{ windows.ports.prometheus }}"
+          tp2_grafana_url: "http://{{ windows.host }}:{{ windows.ports.grafana }}"
+    managed_targets:
+      children:
+        linux_targets:
+        windows_targets:
