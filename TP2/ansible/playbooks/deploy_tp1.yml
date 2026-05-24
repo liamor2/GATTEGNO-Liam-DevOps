@@ -161,7 +161,7 @@
     - name: Run scheduled task for Windows deploy
       ansible.windows.win_command: schtasks /Run /TN TP2Deploy
 
-    - name: Wait for task completion
+    - name: Wait for task completion and get exit code
       ansible.windows.win_powershell:
         script: |
           $name = 'TP2Deploy'
@@ -171,16 +171,17 @@
             Start-Sleep -Seconds 5
           }
           $info = Get-ScheduledTaskInfo -TaskName $name
-          [pscustomobject]@{
-            LastTaskResult = $info.LastTaskResult
-            State = (Get-ScheduledTask -TaskName $name).State
-          } | ConvertTo-Json -Compress
+          Write-Output $info.LastTaskResult
       register: tp2_task_result
+
+    - name: Show Windows deploy task result
+      ansible.builtin.debug:
+        var: tp2_task_result.output
 
     - name: Fail if scheduled task failed
       ansible.builtin.fail:
-        msg: "Windows deploy task failed: {{ tp2_task_result.stdout }}"
-      when: (tp2_task_result.stdout | from_json).LastTaskResult != 0
+        msg: "Windows deploy task failed, LastTaskResult={{ tp2_task_result.output[0] }}"
+      when: (tp2_task_result.output[0] | int) != 0
 
     - name: Delete scheduled task
       ansible.windows.win_command: schtasks /Delete /TN TP2Deploy /F
