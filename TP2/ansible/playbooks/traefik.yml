@@ -10,6 +10,21 @@
         mode: "0755"
       when: tp2_load_balancer_enabled
 
+    - name: Check existing Traefik dynamic path type
+      ansible.builtin.stat:
+        path: "{{ tp2_project_root }}/TP2/generated/traefik/dynamic.yml"
+      register: tp2_traefik_dynamic_path
+      when: tp2_load_balancer_enabled
+
+    - name: Remove invalid Traefik dynamic directory
+      ansible.builtin.file:
+        path: "{{ tp2_project_root }}/TP2/generated/traefik/dynamic.yml"
+        state: absent
+      when:
+        - tp2_load_balancer_enabled
+        - tp2_traefik_dynamic_path.stat.exists
+        - tp2_traefik_dynamic_path.stat.isdir
+
     - name: Render Traefik dynamic configuration
       ansible.builtin.command: >
         python3 TP2/scripts/render_inventory.py
