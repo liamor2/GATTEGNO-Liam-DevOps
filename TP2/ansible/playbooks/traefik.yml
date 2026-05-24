@@ -50,7 +50,7 @@
       ansible.builtin.command: >
         docker compose
         --env-file generated/traefik/traefik.env
-        up -d traefik
+        up -d --force-recreate traefik
       args:
         chdir: "{{ tp2_project_root }}/TP2"
       changed_when: true
