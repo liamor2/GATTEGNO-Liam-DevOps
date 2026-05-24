@@ -144,10 +144,46 @@
       ansible.windows.win_command: docker version
       changed_when: false
 
-    - name: Deploy TP1 on Windows
-      ansible.windows.win_command: docker compose up -d --build --remove-orphans
-      args:
-        chdir: "{{ tp2_deploy_path }}"
+    - name: Write Windows deploy script
+      ansible.windows.win_copy:
+        dest: C:\Windows\Temp\tp2-deploy.ps1
+        content: |
+          $ErrorActionPreference = 'Stop'
+          Set-Location "{{ tp2_deploy_path }}"
+          docker compose up -d --build --remove-orphans
+
+    - name: Create scheduled task for Windows deploy
+      ansible.windows.win_command: >
+        schtasks /Create /TN TP2Deploy
+        /TR "powershell.exe -ExecutionPolicy Bypass -File C:\Windows\Temp\tp2-deploy.ps1"
+        /SC ONCE /ST 23:59 /RL HIGHEST /RU "{{ ansible_user }}" /RP "{{ ansible_password }}" /F
+
+    - name: Run scheduled task for Windows deploy
+      ansible.windows.win_command: schtasks /Run /TN TP2Deploy
+
+    - name: Wait for task completion
+      ansible.windows.win_powershell:
+        script: |
+          $name = 'TP2Deploy'
+          for ($i=0; $i -lt 120; $i++) {
+            $t = Get-ScheduledTask -TaskName $name
+            if ($t.State -ne 'Running') { break }
+            Start-Sleep -Seconds 5
+          }
+          $info = Get-ScheduledTaskInfo -TaskName $name
+          [pscustomobject]@{
+            LastTaskResult = $info.LastTaskResult
+            State = (Get-ScheduledTask -TaskName $name).State
+          } | ConvertTo-Json -Compress
+      register: tp2_task_result
+
+    - name: Fail if scheduled task failed
+      ansible.builtin.fail:
+        msg: "Windows deploy task failed: {{ tp2_task_result.stdout }}"
+      when: (tp2_task_result.stdout | from_json).LastTaskResult != 0
+
+    - name: Delete scheduled task
+      ansible.windows.win_command: schtasks /Delete /TN TP2Deploy /F
 
 - name: Validate TP1 deployments
   hosts: managed_targets
