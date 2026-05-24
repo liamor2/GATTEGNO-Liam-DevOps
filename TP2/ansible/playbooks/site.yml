@@ -7,6 +7,3 @@
 
 - name: TP1 deployment automation
   ansible.builtin.import_playbook: deploy_tp1.yml
-
-- name: Traefik load balancer automation
-  ansible.builtin.import_playbook: traefik.yml

@@ -170,3 +170,25 @@ jobs:
           ansible-playbook
           -i TP2/generated/inventory.yml
           TP2/ansible/playbooks/site.yml
+
+      - name: Start Traefik on runner host
+        run: >
+          docker compose
+          --env-file generated/traefik/traefik.env
+          up -d --force-recreate traefik
+
+      - name: Show Traefik routers
+        run: |
+          docker compose exec -T traefik sh -lc "wget -qO- http://127.0.0.1:8080/api/http/routers"
+
+      - name: Validate Traefik load-balanced routes
+        run: |
+          set -a
+          . generated/traefik/traefik.env
+          set +a
+          HTTP_PORT="${TP2_TRAEFIK_HTTP_PORT:-80}"
+
+          curl -fsS -H "Host: app.runner.local" "http://127.0.0.1:${HTTP_PORT}/"
+          curl -fsS -X POST -H "Host: api.runner.local" "http://127.0.0.1:${HTTP_PORT}/api/click"
+          curl -fsS -H "Host: prometheus.runner.local" "http://127.0.0.1:${HTTP_PORT}/-/ready"
+          curl -fsS -H "Host: grafana.runner.local" "http://127.0.0.1:${HTTP_PORT}/api/health"
