@@ -24,7 +24,7 @@ concurrency:
 jobs:
   runner-proof:
     name: Runner proof
-    runs-on: [self-hosted, linux, x64, tp2]
+    runs-on: [self-hosted, linux, x64]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -40,7 +40,7 @@ jobs:
 
   terraform-inventory:
     name: Terraform and Jinja2 inventory
-    runs-on: [self-hosted, linux, x64, tp2]
+    runs-on: [self-hosted, linux, x64]
     needs:
       - runner-proof
     defaults:
@@ -131,7 +131,7 @@ jobs:
 
   ansible-automation:
     name: Ansible facts timezone and TP1 deploy
-    runs-on: [self-hosted, linux, x64, tp2]
+    runs-on: [self-hosted, linux, x64]
     needs:
       - terraform-inventory
     defaults:
