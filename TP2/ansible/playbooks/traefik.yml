@@ -56,55 +56,63 @@
       changed_when: true
       when: tp2_load_balancer_enabled
 
+    - name: Show Traefik dynamic file
+      ansible.builtin.command: cat {{ tp2_project_root }}/TP2/generated/traefik/dynamic.yml
+      register: traefik_dynamic_dump
+      changed_when: false
+      when: tp2_load_balancer_enabled
+
+    - ansible.builtin.debug:
+        var: traefik_dynamic_dump.stdout_lines
+      when: tp2_load_balancer_enabled
+
 - name: Validate Traefik load-balanced routes
   hosts: controller
   gather_facts: false
   tasks:
     - name: Validate Traefik frontend route
-      ansible.builtin.uri:
-        url: "http://{{ tp2_load_balancer_host }}:{{ tp2_load_balancer_http_port }}/"
-        headers:
-          Host: "{{ tp2_load_balancer_hostnames.frontend }}"
-        status_code: 200
+      ansible.builtin.command: >
+        curl -fsS
+        --resolve {{ tp2_load_balancer_hostnames.frontend }}:{{ tp2_load_balancer_http_port }}:{{ tp2_load_balancer_host }}
+        http://{{ tp2_load_balancer_hostnames.frontend }}:{{ tp2_load_balancer_http_port }}/
       register: traefik_frontend_probe
-      until: traefik_frontend_probe.status == 200
+      changed_when: false
       retries: 30
       delay: 5
+      until: traefik_frontend_probe.rc == 0
       when: tp2_load_balancer_enabled
 
     - name: Validate Traefik backend route
-      ansible.builtin.uri:
-        url: "http://{{ tp2_load_balancer_host }}:{{ tp2_load_balancer_http_port }}/api/click"
-        method: POST
-        headers:
-          Host: "{{ tp2_load_balancer_hostnames.backend }}"
-        status_code: 200
-        return_content: true
+      ansible.builtin.command: >
+        curl -fsS -X POST
+        --resolve {{ tp2_load_balancer_hostnames.backend }}:{{ tp2_load_balancer_http_port }}:{{ tp2_load_balancer_host }}
+        http://{{ tp2_load_balancer_hostnames.backend }}:{{ tp2_load_balancer_http_port }}/api/click
       register: traefik_backend_probe
+      changed_when: false
       when: tp2_load_balancer_enabled
 
     - name: Validate Traefik Prometheus route
-      ansible.builtin.uri:
-        url: "http://{{ tp2_load_balancer_host }}:{{ tp2_load_balancer_http_port }}/-/ready"
-        headers:
-          Host: "{{ tp2_load_balancer_hostnames.prometheus }}"
-        status_code: 200
+      ansible.builtin.command: >
+        curl -fsS
+        --resolve {{ tp2_load_balancer_hostnames.prometheus }}:{{ tp2_load_balancer_http_port }}:{{ tp2_load_balancer_host }}
+        http://{{ tp2_load_balancer_hostnames.prometheus }}:{{ tp2_load_balancer_http_port }}/-/ready
       register: traefik_prometheus_probe
-      until: traefik_prometheus_probe.status == 200
+      changed_when: false
       retries: 30
       delay: 5
+      until: traefik_prometheus_probe.rc == 0
       when: tp2_load_balancer_enabled
 
     - name: Validate Traefik Grafana route
-      ansible.builtin.uri:
-        url: "http://{{ tp2_load_balancer_host }}:{{ tp2_load_balancer_http_port }}/api/health"
-        headers:
-          Host: "{{ tp2_load_balancer_hostnames.grafana }}"
-        status_code: 200
+      ansible.builtin.command: >
+        curl -fsS
+        --resolve {{ tp2_load_balancer_hostnames.grafana }}:{{ tp2_load_balancer_http_port }}:{{ tp2_load_balancer_host }}
+        http://{{ tp2_load_balancer_hostnames.grafana }}:{{ tp2_load_balancer_http_port }}/api/health
       register: traefik_grafana_probe
-      until: traefik_grafana_probe.status == 200
+      changed_when: false
       retries: 30
       delay: 5
+      until: traefik_grafana_probe.rc == 0
       when: tp2_load_balancer_enabled
 
     - name: Show Traefik validation proof
