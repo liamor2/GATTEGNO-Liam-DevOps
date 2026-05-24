@@ -71,16 +71,16 @@
   gather_facts: false
   tasks:
     - name: Validate Traefik frontend route
-        ansible.builtin.command: >
-          curl -fsS
-          -H "Host: {{ tp2_load_balancer_hostnames.frontend }}"
-          http://{{ tp2_load_balancer_host }}:{{ tp2_load_balancer_http_port }}/
-        register: traefik_frontend_probe
-        changed_when: false
-        retries: 30
-        delay: 5
-        until: traefik_frontend_probe.rc == 0
-        when: tp2_load_balancer_enabled
+      ansible.builtin.command: >
+        curl -fsS
+        -H "Host: {{ tp2_load_balancer_hostnames.frontend }}"
+        http://{{ tp2_load_balancer_host }}:{{ tp2_load_balancer_http_port }}/
+      register: traefik_frontend_probe
+      changed_when: false
+      retries: 30
+      delay: 5
+      until: traefik_frontend_probe.rc == 0
+      when: tp2_load_balancer_enabled
 
     - name: Validate Traefik backend route
       ansible.builtin.command: >
@@ -95,7 +95,7 @@
       ansible.builtin.command: >
         curl -fsS
         -H "Host: {{ tp2_load_balancer_hostnames.prometheus }}"
-        http://{{ tp2_load_balancer_hostnames.prometheus }}:{{ tp2_load_balancer_http_port }}/-/ready
+        http://{{ tp2_load_balancer_host }}:{{ tp2_load_balancer_http_port }}/-/ready
       register: traefik_prometheus_probe
       changed_when: false
       retries: 30
@@ -107,7 +107,7 @@
       ansible.builtin.command: >
         curl -fsS
         -H "Host: {{ tp2_load_balancer_hostnames.grafana }}"
-        http://{{ tp2_load_balancer_hostnames.grafana }}:{{ tp2_load_balancer_http_port }}/api/health
+        http://{{ tp2_load_balancer_host }}:{{ tp2_load_balancer_http_port }}/api/health
       register: traefik_grafana_probe
       changed_when: false
       retries: 30
@@ -119,7 +119,7 @@
       ansible.builtin.debug:
         msg:
           frontend: "{{ tp2_load_balancer_urls.frontend }}"
-          backend_response: "{{ traefik_backend_probe.json | default({}) }}"
+          backend_response: "{{ traefik_backend_probe.stdout | default('') }}"
           prometheus: "{{ tp2_load_balancer_urls.prometheus }}"
           grafana: "{{ tp2_load_balancer_urls.grafana }}"
       when: tp2_load_balancer_enabled
